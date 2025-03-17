@@ -224,15 +224,16 @@ if __name__ == "__main__" or True:
     else:
         if args.imagesign:
             ob = pyplot.imread(args.imagesign)
-            ea, fa = encodeImage(oa, ob, xmap, margins, args.alpha)
+            ea, fa = encodeImage(oa, ob, xmap, margins, args.alpha, mode=args.mode)
             if args.output is None:
                 base, ext = path.splitext(args.input)
                 args.output = base + "+" + path.basename(args.imagesign) + ext
         elif args.textsign:
-            ea, fa = encodeText(oa, args.textsign, xmap, margins, args.alpha)
+            ea, fa = encodeText(oa, args.textsign, xmap, margins, args.alpha, mode=args.mode)
             if args.output is None:
                 base, ext = path.splitext(args.input)
                 args.output = base + "_" + path.basename(args.textsign) + ext
+
         else:
             print("Neither image or text signature is not given.")
             exit(2)
