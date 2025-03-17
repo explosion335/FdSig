@@ -194,8 +194,9 @@ if __name__ == "__main__" or True:
     argparser.add_argument("-a", "--alpha", dest = "alpha",
         type = float, help = "Signature blending weight.")
     argparser.add_argument("-m", "--mode", dest="mode", 
-        type=str, default="add", 
-        help="Encoding modes: 'add', 'mix', 'mul'. Default is 'add'.")
+        type=str, choices=["add", "mix", "mul"], 
+        default="add", help="Specify encoding mode: 'add', 'mix', or 'mul' (default: 'add').")
+
     # decode
     argparser.add_argument("-d", "--decode", dest = "decode", 
         type = str, help = "Image filename to be decoded.")
@@ -203,8 +204,7 @@ if __name__ == "__main__" or True:
     argparser.add_argument("-v", dest = "visual",
         action = "store_true", default = False, help = "Display image.")
     args = argparser.parse_args()
-    
-    modes = args.mode.split(',')
+        
     oa = pyplot.imread(args.input)
     margins = (oa.shape[0] // 7, oa.shape[1] // 7)
     margins=(1,1)
@@ -224,22 +224,21 @@ if __name__ == "__main__" or True:
     else:
         if args.imagesign:
             ob = pyplot.imread(args.imagesign)
-            for mode in modes:
-                ea, fa = encodeImage(oa, ob, xmap, margins, args.alpha, mode=mode)
-                output_filename = f"{args.output}-{mode}.png" if args.output else f"output-{mode}.png"
-                imsaveEx(output_filename, ea)
-                print(f"Image saved with {mode} mode: {output_filename}")
+            ea, fa = encodeImage(oa, ob, xmap, margins, args.alpha)
+            if args.output is None:
+                base, ext = path.splitext(args.input)
+                args.output = base + "+" + path.basename(args.imagesign) + ext
         elif args.textsign:
-            for mode in modes:
-                ea, fa = encodeText(oa, args.textsign, xmap, margins, args.alpha, mode=mode)
-                output_filename = f"{args.output}-{mode}.png" if args.output else f"output-{mode}.png"
-                imsaveEx(output_filename, ea)
-                print(f"Image saved with {mode} mode: {output_filename}")
-
+            ea, fa = encodeText(oa, args.textsign, xmap, margins, args.alpha)
+            if args.output is None:
+                base, ext = path.splitext(args.input)
+                args.output = base + "_" + path.basename(args.textsign) + ext
         else:
-            print("Neither image nor text signature is provided.")
+            print("Neither image or text signature is not given.")
             exit(2)
-
+        
+        imsaveEx(args.output, ea)
+        print("Image saved.")
         if args.visual:
             xa = pyplot.imread(args.output)
             xb = decodeImage(xa, xmap, margins, oa)
