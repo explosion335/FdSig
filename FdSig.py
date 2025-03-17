@@ -70,54 +70,44 @@ def xmapGen(shape, secret = None):
     xh = xh.reshape((-1, 1))
     return xh, xw
 
-def encodeImage(oa, ob, xmap = None, margins = (1, 1), alpha = None):
+def encodeImage(oa, ob, xmap=None, margins=(1, 1), alpha=None):
     na = normalizedRGB(oa)
     nb = normalizedRGB(ob)
     fa = np.fft.fft2(na, None, (0, 1))
     pb = np.zeros((na.shape[0]//2-margins[0]*2, na.shape[1]-margins[1]*2, 3))
     pb[:nb.shape[0], :nb.shape[1]] = nb
 
-    low = 0
     if alpha is None:
         _, low, high = centralize(fa)
-        alpha = (high - low)# / 2
-        print("encodeImage: alpha = {}".format(alpha))
+        alpha = (high - low)  # Keep original range
+        alpha = max(alpha, 0.1)  # Ensure alpha is not too small
+        print("encodeImage: alpha = {:.5f}".format(alpha))
 
     if xmap is None:
         xh, xw = xmapGen(pb.shape)
     else:
         xh, xw = xmap[:2]
         
-    # add mode
+    # Add mode
     fa[+margins[0]+xh, +margins[1]+xw] += pb * alpha
     fa[-margins[0]-xh, -margins[1]-xw] += pb * alpha
-    # mix mode
-#    fa[+margins[0]+xh, +margins[1]+xw] = mix(fa[+margins[0]+xh, +margins[1]+xw], pb, alpha, True)
-#    fa[-margins[0]-xh, -margins[1]-xw] = mix(fa[-margins[0]-xh, -margins[1]-xw], pb, alpha, True)
-    # multiply mode
-#    la = np.abs(fa[+margins[0]+xh, +margins[1]+xw])
-#    la[np.where(la<1e-3)] = 1e-3
-#    fa[+margins[0]+xh, +margins[1]+xw] *= (la + pb * alpha) / la
-#    la = np.abs(fa[-margins[0]-xh, -margins[1]-xw])
-#    la[np.where(la<1e-3)] = 1e-3
-#    fa[-margins[0]-xh, -margins[1]-xw] *= (la + pb * alpha) / la
     
-    xa = np.fft.ifft2(fa, None, (0, 1))
-    # use real part
-    xa = xa.real
+    xa = np.fft.ifft2(fa, None, (0, 1)).real
     xa = np.clip(xa, 0, 1)
-    # use abs + zoom/shift
-#    xa = np.abs(xa)
-#    nv = np.average(na)
-#    ev = np.average(ea)
-#    delta = (nv - ev) / (1 - ev) if 1 > ev else 0
-#    xa = xa * (1 - delta) + delta
+
+    # Brightness correction
+    xa = (xa - xa.min()) / (xa.max() - xa.min() + 1e-5)  # Normalize
+    xa = xa * (na.max() - na.min()) + na.min()  # Match input brightness
+
     return xa, fa
-    
+
 def encodeText(oa, text, *args, **kwargs):
     font = ImageFont.truetype("consola.ttf", oa.shape[0] // 7)
-    #font = ImageFont.load_default()
-    renderSize = font.getsize(text)
+    # font = ImageFont.load_default()
+    # renderSize = font.getsize(text)
+    left, top, right, bottom = font.getbbox(text)
+    tw, th = right - left, bottom - top
+    renderSize = tw, th
     padding = min(renderSize) * 2 // 10
     renderSize = (renderSize[0] + padding * 2, renderSize[1] + padding * 2)
     textImg = Image.new('RGB', renderSize, (0, 0, 0))
