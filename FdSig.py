@@ -70,7 +70,7 @@ def xmapGen(shape, secret = None):
     xh = xh.reshape((-1, 1))
     return xh, xw
 
-def encodeImage(oa, ob, xmap=None, margins=(1, 1), alpha=None):
+def encodeImage(oa, ob, xmap=None, margins=(1, 1), alpha=None, mode="add"):
     na = normalizedRGB(oa)
     nb = normalizedRGB(ob)
     fa = np.fft.fft2(na, None, (0, 1))
@@ -79,19 +79,31 @@ def encodeImage(oa, ob, xmap=None, margins=(1, 1), alpha=None):
 
     if alpha is None:
         _, low, high = centralize(fa)
-        alpha = (high - low)  # Keep original range
-        alpha = max(alpha, 0.1)  # Ensure alpha is not too small
-        print("encodeImage: alpha = {:.5f}".format(alpha))
+        alpha = (high - low)
+        alpha = max(alpha, 0.1)
+        print("encodeImage: alpha = {}".format(alpha))
 
     if xmap is None:
         xh, xw = xmapGen(pb.shape)
     else:
         xh, xw = xmap[:2]
-        
-    # Add mode
-    fa[+margins[0]+xh, +margins[1]+xw] += pb * alpha
-    fa[-margins[0]-xh, -margins[1]-xw] += pb * alpha
     
+    if mode == "add":
+        fa[+margins[0]+xh, +margins[1]+xw] += pb * alpha
+        fa[-margins[0]-xh, -margins[1]-xw] += pb * alpha
+    elif mode == "mix":
+        fa[+margins[0]+xh, +margins[1]+xw] = mix(fa[+margins[0]+xh, +margins[1]+xw], pb, alpha, True)
+        fa[-margins[0]-xh, -margins[1]-xw] = mix(fa[-margins[0]-xh, -margins[1]-xw], pb, alpha, True)
+    elif mode == "mul":
+        la = np.abs(fa[+margins[0]+xh, +margins[1]+xw])
+        la[np.where(la<1e-3)] = 1e-3
+        fa[+margins[0]+xh, +margins[1]+xw] *= (la + pb * alpha) / la
+        la = np.abs(fa[-margins[0]-xh, -margins[1]-xw])
+        la[np.where(la<1e-3)] = 1e-3
+        fa[-margins[0]-xh, -margins[1]-xw] *= (la + pb * alpha) / la
+    else:
+        raise ValueError("Invalid mode specified. Choose 'add', 'mix', or 'multiply'.")
+
     xa = np.fft.ifft2(fa, None, (0, 1)).real
     xa = np.clip(xa, 0, 1)
 
@@ -100,6 +112,7 @@ def encodeImage(oa, ob, xmap=None, margins=(1, 1), alpha=None):
     xa = xa * (na.max() - na.min()) + na.min()  # Match input brightness
 
     return xa, fa
+
 
 def encodeText(oa, text, *args, **kwargs):
     font = ImageFont.truetype("consola.ttf", oa.shape[0] // 7)
@@ -180,6 +193,9 @@ if __name__ == "__main__" or True:
         type = str, help = "Signature text.")
     argparser.add_argument("-a", "--alpha", dest = "alpha",
         type = float, help = "Signature blending weight.")
+    argparser.add_argument("-m", "--mode", dest="mode", 
+        type=str, default="add", 
+        help="Encoding modes: 'add', 'mix', 'mul'. Default is 'add'.")
     # decode
     argparser.add_argument("-d", "--decode", dest = "decode", 
         type = str, help = "Image filename to be decoded.")
@@ -187,7 +203,8 @@ if __name__ == "__main__" or True:
     argparser.add_argument("-v", dest = "visual",
         action = "store_true", default = False, help = "Display image.")
     args = argparser.parse_args()
-        
+    
+    modes = args.mode.split(',')
     oa = pyplot.imread(args.input)
     margins = (oa.shape[0] // 7, oa.shape[1] // 7)
     margins=(1,1)
@@ -207,32 +224,41 @@ if __name__ == "__main__" or True:
     else:
         if args.imagesign:
             ob = pyplot.imread(args.imagesign)
-            ea, fa = encodeImage(oa, ob, xmap, margins, args.alpha)
-            if args.output is None:
-                base, ext = path.splitext(args.input)
-                args.output = base + "+" + path.basename(args.imagesign) + ext
+            for mode in modes:
+                ea, fa = encodeImage(oa, ob, xmap, margins, args.alpha, mode=mode)
+                output_filename = f"{args.output}-{mode}.png" if args.output else f"output-{mode}.png"
+                imsaveEx(output_filename, ea)
+                print(f"Image saved with {mode} mode: {output_filename}")
         elif args.textsign:
-            ea, fa = encodeText(oa, args.textsign, xmap, margins, args.alpha)
-            if args.output is None:
-                base, ext = path.splitext(args.input)
-                args.output = base + "_" + path.basename(args.textsign) + ext
+            for mode in modes:
+                ea, fa = encodeText(oa, args.textsign, xmap, margins, args.alpha, mode=mode)
+                output_filename = f"{args.output}-{mode}.png" if args.output else f"output-{mode}.png"
+                imsaveEx(output_filename, ea)
+                print(f"Image saved with {mode} mode: {output_filename}")
+
         else:
-            print("Neither image or text signature is not given.")
+            print("Neither image nor text signature is provided.")
             exit(2)
-        
-        imsaveEx(args.output, ea)
-        print("Image saved.")
-        if args.visual:
-            xa = pyplot.imread(args.output)
-            xb = decodeImage(xa, xmap, margins, oa)
-    
-            pyplot.figure()
-            pyplot.subplot(221)
-            imshowEx(ea, title = "enco")
-            pyplot.subplot(222)
-            imshowEx(normalizedRGB(xa) - normalizedRGB(oa), title = "delt")
-            pyplot.subplot(223)
-            imshowEx(fa, title = "freq")
-            pyplot.subplot(224)
-            imshowEx(xb, title = "deco")
-            pyplot.show() #display
+
+if args.visual:
+    for mode in modes:
+        output_filename = f"{args.output}-{mode}.png" if args.output else f"output-{mode}.png"
+        xa = pyplot.imread(output_filename)
+        xb = decodeImage(xa, xmap, margins, oa)
+
+        pyplot.figure(figsize=(10, 8))
+        pyplot.suptitle(f"Mode: {mode}")
+
+        pyplot.subplot(221)
+        imshowEx(ea, title=f"Encoded ({mode})")
+
+        pyplot.subplot(222)
+        imshowEx(normalizedRGB(xa) - normalizedRGB(oa), title="Difference")
+
+        pyplot.subplot(223)
+        imshowEx(fa, title="Frequency Domain")
+
+        pyplot.subplot(224)
+        imshowEx(xb, title="Decoded Image")
+
+        pyplot.show()  # Display images for each mode
