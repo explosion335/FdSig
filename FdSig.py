@@ -240,25 +240,17 @@ if __name__ == "__main__" or True:
             print("Neither image nor text signature is provided.")
             exit(2)
 
-if args.visual:
-    for mode in modes:
-        output_filename = f"{args.output}-{mode}.png" if args.output else f"output-{mode}.png"
-        xa = pyplot.imread(output_filename)
-        xb = decodeImage(xa, xmap, margins, oa)
-
-        pyplot.figure(figsize=(10, 8))
-        pyplot.suptitle(f"Mode: {mode}")
-
-        pyplot.subplot(221)
-        imshowEx(ea, title=f"Encoded ({mode})")
-
-        pyplot.subplot(222)
-        imshowEx(normalizedRGB(xa) - normalizedRGB(oa), title="Difference")
-
-        pyplot.subplot(223)
-        imshowEx(fa, title="Frequency Domain")
-
-        pyplot.subplot(224)
-        imshowEx(xb, title="Decoded Image")
-
-        pyplot.show()  # Display images for each mode
+        if args.visual:
+            xa = pyplot.imread(args.output)
+            xb = decodeImage(xa, xmap, margins, oa)
+    
+            pyplot.figure()
+            pyplot.subplot(221)
+            imshowEx(ea, title = "enco")
+            pyplot.subplot(222)
+            imshowEx(normalizedRGB(xa) - normalizedRGB(oa), title = "delt")
+            pyplot.subplot(223)
+            imshowEx(fa, title = "freq")
+            pyplot.subplot(224)
+            imshowEx(xb, title = "deco")
+            pyplot.show() #display
