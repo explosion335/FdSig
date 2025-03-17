@@ -15,7 +15,7 @@ Usage
 ---
 
 usage: FdSig.py [-h] [-o OUTPUT] [-s SECRET] [-i IMAGESIGN] [-t TEXTSIGN]
-                [-a ALPHA] [-d DECODE] [-v]
+                [-a ALPHA] [-m mode] [-d DECODE] [-v]
                 file
 
 positional arguments:
@@ -33,6 +33,8 @@ optional arguments:
                         Signature text.
   -a ALPHA, --alpha ALPHA
                         Signature blending weight.
+  -m MODE, --mode MODE
+                        Encoding modes: 'add', 'mix', 'mul'. Default is 'add'.
   -d DECODE, --decode DECODE
                         Image filename to be decoded.
   -v                    Display image.
